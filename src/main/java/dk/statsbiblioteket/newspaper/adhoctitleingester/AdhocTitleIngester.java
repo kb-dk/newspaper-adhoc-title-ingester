@@ -30,7 +30,7 @@ public class AdhocTitleIngester {
     private static final String NEWSPAPER_TEMPLATE = "doms:Template_Newspaper";
     private static final String NEWSPAPER_DATASTREAM = "MODS";
     private static final String NEWSPAPER_RELATION
-            = "http://doms.statsbiblioteket.dk/relations/default/0/1/#isPartOfNewspaper";
+            = "http://www.loc.gov/mods/rdf/v1#relatedSucceeding";
     private static final String LOG_MESSAGE = "Adding newspaper title";
 
     private static final String FEDORA_URI_PREFIX = "info:fedora/";
