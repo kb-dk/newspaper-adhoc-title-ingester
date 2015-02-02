@@ -11,6 +11,7 @@ import dk.statsbiblioteket.doms.webservices.authentication.Credentials;
 
 import javax.xml.bind.JAXBException;
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -56,16 +57,24 @@ public class AdhocTitleIngester {
         String domsPassword = properties.getProperty("doms.password", "fedoraAdminPass");
         String domsUrl = properties.getProperty("doms.url", "http://achernar:7880/fedora");
         String domsPidgeneratorUrl = properties.getProperty("doms.pidgenerator.url", "http://achernar:7880/pidgenerator-service");
-        String sourceCharset = properties.getProperty("source.charset", "cp1252");
-        List<String> pids = adhocTitleIngester.ingestDirectory(args[0], new EnhancedFedoraImpl(
-                new Credentials(domsUsername, domsPassword), domsUrl, domsPidgeneratorUrl, null), sourceCharset);
-        System.out.println(pids);
+        String sourceCharset = properties.getProperty("source.charset", "utf-8");
+        for (File dir : new File(args[0]).listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.isDirectory();
+            }
+        })) {
+            System.out.println(dir);
+            List<String> pids = adhocTitleIngester.ingestDirectory(dir, new EnhancedFedoraImpl(
+                    new Credentials(domsUsername, domsPassword), domsUrl, domsPidgeneratorUrl, null), sourceCharset);
+            System.out.println(pids);
+        }
     }
 
-    public List<String> ingestDirectory(String sourceDirectory, EnhancedFedoraImpl enhancedFedora, String sourceCharset)
+    public List<String> ingestDirectory(File sourceDirectory, EnhancedFedoraImpl enhancedFedora, String sourceCharset)
             throws IOException, PIDGeneratorException, JAXBException, BackendMethodFailedException,
             ObjectIsWrongTypeException, BackendInvalidResourceException, BackendInvalidCredsException {
-        File[] files = new File(sourceDirectory).listFiles(new FilenameFilter() {
+        File[] files = sourceDirectory.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
                 return name.endsWith(".xml");
@@ -92,8 +101,15 @@ public class AdhocTitleIngester {
             throws IOException, BackendInvalidCredsException, BackendMethodFailedException, ObjectIsWrongTypeException,
             BackendInvalidResourceException, PIDGeneratorException {
         byte[] bytes = new String(Files.readAllBytes(file.toPath()), sourceCharset).getBytes("UTF-8");
-
-        String pid = enhancedFedora.cloneTemplate(NEWSPAPER_TEMPLATE, Arrays.asList("path:" + file.getName()), LOG_MESSAGE);
+        String identifier = "path:" + file.getName();
+        List<String> pids = enhancedFedora.findObjectFromDCIdentifier(identifier);
+        String pid;
+        if (pids != null && !pids.isEmpty()) {
+            pid = pids.get(0);
+            enhancedFedora.modifyObjectState(pid, "I", LOG_MESSAGE);
+        } else {
+            pid = enhancedFedora.cloneTemplate(NEWSPAPER_TEMPLATE, Arrays.asList(identifier), LOG_MESSAGE);
+        }
         enhancedFedora.modifyObjectLabel(pid, file.getName().replaceAll("\\.xml$", ""), LOG_MESSAGE);
         enhancedFedora.modifyDatastreamByValue(pid, NEWSPAPER_DATASTREAM, ChecksumType.MD5, null, bytes,
                                                Collections.<String>emptyList(), "text/xml", LOG_MESSAGE, null);
